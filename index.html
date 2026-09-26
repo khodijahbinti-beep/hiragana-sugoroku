@@ -1,0 +1,104 @@
+from pathlib import Path
+
+html = """<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hiragana Sugoroku</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f7f1e8;color:#302a33}
+.wrap{max-width:1100px;margin:auto;padding:22px}.card{background:#fff;border:2px solid #e4d8ca;border-radius:22px;padding:22px;box-shadow:0 8px 25px #0001}
+.center{text-align:center}h1{font-size:clamp(32px,6vw,58px);margin:8px 0}h2{margin:4px 0 15px}.sub,.small{color:#756d76}
+button{font:inherit;cursor:pointer}.team-select{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin:20px 0}
+.team-select button,.choice{border:2px solid #ddd3ca;background:#fff;border-radius:13px;padding:13px 20px;font-weight:700}
+.primary{border:0;border-radius:13px;background:#76568a;color:#fff;padding:13px 21px;font-weight:800}
+.game-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.status{background:#f2ebf5;border-radius:13px;padding:10px 14px;font-weight:800}
+.scores{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}.score{border:2px solid #e4d8ca;border-radius:12px;padding:8px 12px;background:#fff;font-weight:700}
+.board{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:18px 0}.cell{min-height:76px;border:2px solid #e5ddd4;border-radius:14px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.start,.goal{border-color:#76568a!important;background:#f2ebf5!important}.special{background:#fff8e8}.num{font-size:12px;color:#827982}.tokens{font-size:18px;min-height:23px;letter-spacing:-5px}
+.controls{display:flex;justify-content:center;align-items:center;gap:12px;flex-wrap:wrap}.dice{font-size:43px;font-weight:800;min-width:80px;text-align:center}
+.challenge{margin-top:18px;background:#fbfaf7;border:2px solid #e4d8ca;border-radius:19px;padding:20px}.type{font-size:13px;font-weight:800;color:#76568a;letter-spacing:1px}
+.question{font-size:clamp(23px,4vw,37px);font-weight:800;text-align:center;margin:17px 0}.choices{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.choice:disabled{opacity:.6;cursor:default}.feedback{text-align:center;font-size:18px;font-weight:800;min-height:26px;margin:14px 0}.win{font-size:26px;font-weight:800;margin:15px 0}
+@media(max-width:650px){.wrap{padding:10px}.card{padding:14px}.board{grid-template-columns:repeat(5,1fr);gap:5px}.cell{min-height:62px}.choices{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<section id="start" class="card center">
+<div style="font-size:52px">🌸🎌🎲</div>
+<h1>ひらがなすごろく</h1><h2>HIRAGANA SUGOROKU</h2>
+<p class="sub">ひらがなを たのしく おぼえよう！</p>
+<p>Pilih jumlah tim untuk memulai.</p>
+<div class="team-select">
+<button data-n="2">2 Tim</button><button data-n="3">3 Tim</button><button data-n="4">4 Tim</button>
+</div>
+<p class="small">Untuk laptop + proyektor. Tidak perlu instal aplikasi dan bisa dimainkan offline.</p>
+</section>
+
+<section id="game" class="card" style="display:none">
+<div class="game-top"><div><div class="small">Giliran sekarang</div><div id="turn" class="status"></div></div>
+<button id="reset" class="primary">↻ Mulai Ulang</button></div>
+<div id="scores" class="scores"></div><div id="board" class="board"></div>
+<div class="controls"><div id="dice" class="dice">🎲</div><button id="roll" class="primary">LEMPAR DADU</button></div>
+<div id="challenge" class="challenge" style="display:none">
+<div id="type" class="type"></div><div id="question" class="question"></div>
+<div id="choices" class="choices"></div><div id="feedback" class="feedback"></div>
+<button id="next" class="primary" style="display:none;margin:auto">つぎへ</button>
+</div>
+<div id="winner" class="challenge center" style="display:none">
+<div class="win">🏆 おめでとうございます！</div><div id="winnerText"></div>
+<button id="again" class="primary" style="margin-top:15px">もういちど あそぶ</button>
+</div>
+</section>
+</div>
+<script>
+const Q=[
+["READ","「あ」 の よみかたは？",["a","i","u","e"],0],
+["READ","「き」 の よみかたは？",["ka","ki","ku","ke"],1],
+["READ","「さ」 の よみかたは？",["sa","shi","su","se"],0],
+["READ","「ち」 の よみかたは？",["ta","chi","tsu","te"],1],
+["READ","「ね」 の よみかたは？",["na","ne","no","ni"],1],
+["FIND","「me」 は どれですか？",["ぬ","め","ね","も"],1],
+["FIND","「yo」 は どれですか？",["や","ゆ","よ","ら"],2],
+["FIND","「fu」 は どれですか？",["ひ","ふ","へ","ほ"],1],
+["FIND","「ri」 は どれですか？",["り","る","れ","ろ"],0],
+["FIND","「ko」 は どれですか？",["か","き","く","こ"],3],
+["READ","「が」 の よみかたは？",["ga","ka","za","da"],0],
+["READ","「ぱ」 の よみかたは？",["ba","pa","ha","ga"],1],
+["FIND","「shi」 は どれですか？",["し","ち","さ","す"],0],
+["READ","「つ」 の よみかたは？",["ta","chi","tsu","te"],2],
+["FIND","「ha」 は どれですか？",["は","ひ","ふ","へ"],0],
+["READ","「も」 の よみかたは？",["ma","mi","mo","mu"],2],
+["FIND","「yu」 は どれですか？",["よ","や","ゆ","ら"],2],
+["FIND","「ke」 は どれですか？",["か","け","き","こ"],1],
+["READ","「ふ」 の よみかたは？",["ha","fu","ho","he"],1],
+["FIND","「to」 は どれですか？",["た","ち","つ","と"],3],
+["READ","「ま」 の よみかたは？",["ma","mi","mu","me"],0],
+["FIND","「ro」 は どれですか？",["ら","り","る","ろ"],3],
+["READ","「し」 の よみかたは？",["sa","shi","su","se"],1],
+["FIND","「na」 は どれですか？",["な","に","ぬ","ね"],0]
+];
+let teams=2,pos=[],score=[],turn=0,qi=0,waiting=true;
+const tok=["🔵","🟢","🟠","🟣"],$=x=>document.getElementById(x);
+document.querySelectorAll("[data-n]").forEach(b=>b.onclick=()=>start(+b.dataset.n));
+function start(n){teams=n;pos=Array(n).fill(0);score=Array(n).fill(0);turn=0;qi=0;waiting=true;$("start").style.display="none";$("game").style.display="block";$("challenge").style.display="none";$("winner").style.display="none";$("roll").disabled=false;$("dice").textContent="🎲";render()}
+function render(){
+$("turn").textContent="TEAM "+(turn+1)+" — giliranmu!";
+$("scores").innerHTML=score.map((s,i)=>`<div class="score">${tok[i]} TEAM ${i+1}: ${s} poin</div>`).join("");
+let out="";for(let i=0;i<=30;i++){let sp=i>0&&i<30?(i%9==0?"⭐":i%7==0?"🎁":i%11==0?"⏪":""):"";let here=pos.map((p,t)=>p==i?tok[t]:"").join("");out+=`<div class="cell ${i==0?"start":""} ${i==30?"goal":""} ${sp?"special":""}"><div class="num">${i==0?"START":i==30?"GOAL":i}</div><div class="tokens">${here}</div><div>${sp}</div></div>`}$("board").innerHTML=out}
+$("roll").onclick=()=>{if(!waiting)return;waiting=false;$("roll").disabled=true;let n=Math.floor(Math.random()*6)+1;$("dice").textContent=["⚀","⚁","⚂","⚃","⚄","⚅"][n-1];pos[turn]=Math.min(30,pos[turn]+n);render();setTimeout(square,400)};
+function square(){let p=pos[turn];if(p==30){score[turn]+=20;render();setTimeout(winner,250);return}if(p%9==0){score[turn]+=20;render();special("⭐ BONUS! +20 poin.");return}if(p%7==0){pos[turn]=Math.min(30,p+2);render();special("🎁 LUCKY! Maju 2 kotak.");return}if(p%11==0){pos[turn]=Math.max(0,p-2);render();special("⏪ BACK! Mundur 2 kotak.");return}question()}
+function special(msg){$("challenge").style.display="block";$("type").textContent="SPECIAL";$("question").textContent=msg;$("choices").innerHTML="";$("feedback").textContent="";$("next").style.display="block"}
+function question(){let q=Q[qi++%Q.length];$("challenge").style.display="block";$("type").textContent=q[0];$("question").textContent=q[1];$("feedback").textContent="";$("next").style.display="none";$("choices").innerHTML="";q[2].forEach((a,i)=>{let b=document.createElement("button");b.className="choice";b.textContent=a;b.onclick=()=>answer(i==q[3],q[2][q[3]]);$("choices").appendChild(b)})}
+function answer(ok,correct){document.querySelectorAll(".choice").forEach(b=>b.disabled=true);if(ok){score[turn]+=10;$("feedback").textContent="🎉 せいかい！ +10 poin"}else{pos[turn]=Math.max(0,pos[turn]-1);$("feedback").textContent="ざんねん！ Jawaban: "+correct+" — mundur 1 kotak"}render();$("next").style.display="block"}
+$("next").onclick=()=>{$("challenge").style.display="none";turn=(turn+1)%teams;waiting=true;$("roll").disabled=false;$("dice").textContent="🎲";render()};
+function winner(){$("winner").style.display="block";$("winnerText").textContent="TEAM "+(turn+1)+" mencapai GOAL dan mendapat bonus 20 poin!";$("roll").disabled=true}
+$("again").onclick=()=>start(teams);$("reset").onclick=()=>start(teams);
+</script>
+</body>
+</html>"""
+p=Path("/mnt/data/hiragana_sugoroku.html")
+p.write_text(html,encoding="utf-8")
+print(p.exists(), p)
